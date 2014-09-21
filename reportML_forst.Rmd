@@ -1,0 +1,86 @@
+---
+title: "Classification of barbell lifting quality using random forests"
+author: "Vivek Yadav"
+date: "Sunday, September 21, 2014"
+output: html_document
+---
+
+### Synopsis
+
+This report presents implentation of another machine learning based algorithm to classify barbell lifting data obtained from wearable sensor. First raw data was processed to discard non-kineamtic data and remove variables without varitions. Random forest method was used to train data. Collected data was split into training (80%), and validation sets (20%). Cross-validation was perfomed using random sampling without replacements. Overall, using random forest, the expected accuracy was above 99%.
+
+#### Data was processed in following steps, 
+
+```{r echo=TRUE,message =FALSE,cache=TRUE}
+
+suppressWarnings(library(caret))
+suppressWarnings(library(tree))
+suppressWarnings(library(rpart)) 
+suppressWarnings(library(e1071))
+suppressWarnings(library(randomForest))
+
+
+data_train<-read.csv('pml-training.csv')
+data_test<-read.csv('pml-testing.csv')
+
+
+
+ind_na = is.na(data_train[1,])
+data_train2 <- as.data.frame(data_train[,ind_na==FALSE])
+data_test2 <- as.data.frame(data_test[,ind_na==FALSE])
+
+
+```
+
+
+1. First step was to exclude data that was non-numeric and was not collected. All columns without data were removed. Futher,there were spelling mistakes in 3 rows where 'pitch' was written as 'picth'.
+2. Removing these variables resulted in 53 predictors. 
+3. Collected data was split into mode1-building (80%) and validation set (20%). 
+4. Data was trained on the training set with 5-fold validation using random forest.
+5. Data was tested on validation set.
+
+``` {r echo=TRUE,message =FALSE,cache=TRUE}
+## removing bad data 
+
+ind_na = is.na(data_train[1,])
+data_train2 <- as.data.frame(data_train[,ind_na==FALSE])
+data_test2 <- as.data.frame(data_test[,ind_na==FALSE])
+
+features<-names(data_train2)
+roll_ind<-grep("_roll_",features,fixed = TRUE)
+pitch_ind<-grep("_pitch_",features,fixed = TRUE)
+picth_ind<-grep("_picth_",features,fixed = TRUE)
+yaw_ind<-grep("_yaw_",features,fixed = TRUE)
+
+# roll_arm, pitch_arm, yaw_arm
+#roll_ind<-grep("roll_arm",features,fixed = TRUE)
+#pitch_ind<-grep("pitch_arm",features,fixed = TRUE)
+#yaw_aind<-grep("yaw_arm",features,fixed = TRUE)
+
+data_train2 <- as.data.frame( data_train2[, -c( roll_ind, pitch_ind, yaw_ind, picth_ind ) ] )
+data_train3 <- data_train2[,-c(1,3,4,5,6,7)]
+
+## fitting model
+
+AllData<- data_train3
+ind_all_predictors<- 2:53
+ind_bad_predictors<- ind_all_predictors[apply(AllData[,2:53],2,sd)==0]
+if (length(ind_bad_predictors)!=0) {
+  
+  ind_predictors <-ind_all_predictors[-ind_bad_predictors]
+  AllData<- AllData[,-ind_bad_predictors]
+}
+predictors<-names(AllData)
+predictors<-predictors[2:(dim(AllData)[2]-1)]
+
+ind_all <- sample(1:dim(AllData)[1]) 
+num_model <- round(length(ind_all)*.8)
+indModel <- ind_all[1:(num_model)]
+
+data_training <- AllData[indModel,]
+data_CV       <- AllData[-indModel,]
+
+rfmod <- randomForest(classe ~ ., data = data_training, do.trace = 100)
+confusionMatrix(predict(rfmod,data_CV),data_CV$classe)
+
+```
